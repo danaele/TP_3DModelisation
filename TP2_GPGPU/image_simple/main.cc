@@ -14,7 +14,7 @@ static GLuint  program;
 static Image  *image;
 static float   alpha = 0.5f;
 // Shader ID to perform different image processing
-enum ShaderID { contrast, threshold, saturation, contour };
+enum ShaderID { contrast, threshold, saturation, contour, blur };
 ShaderID shaderID = contrast; //Default value is the original contrast modifier from the subject
 
 struct vec2
@@ -36,6 +36,9 @@ static void update_uniforms()
       glUniform1f(get_uni_loc(program, "alpha"), alpha); PRINT_OPENGL_ERROR();
       break;
     case contour:
+      glUniform2f(get_uni_loc(program, "size"), 800, 450); PRINT_OPENGL_ERROR();
+      break;
+    case blur:
       glUniform2f(get_uni_loc(program, "size"), 800, 450); PRINT_OPENGL_ERROR();
       break;
     }
@@ -132,6 +135,10 @@ static void keyboard_callback(unsigned char key, int, int)
     case '3'://Edges detection
       program = read_shader("shader.vert", "contour.frag", {"position", "tex_coord"});
       shaderID = contour;
+      break;
+    case '4'://Blur
+      program = read_shader("shader.vert", "blur.frag", {"position", "tex_coord"});
+      shaderID = blur;
       break;
   }
   glUniform1i( get_uni_loc(program, "texture_id"), 0 ); PRINT_OPENGL_ERROR();
