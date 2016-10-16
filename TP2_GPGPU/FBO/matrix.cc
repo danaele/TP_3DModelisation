@@ -215,3 +215,13 @@ void matrix::rotate(float angle, const vec3 &v)
   *this = *this * mat;
 }
 
+/******************************************************************************\
+ * matrix::transform                                                          *
+\******************************************************************************/
+vec3 matrix::transform(const vec3 &in)
+{
+  return vec3(in.x * m[ 0] + in.y * m[ 4] + in.z * m[ 8] + m[12],
+              in.x * m[ 1] + in.y * m[ 5] + in.z * m[ 9] + m[13],
+              in.x * m[ 2] + in.y * m[ 6] + in.z * m[10] + m[14]);
+}
+

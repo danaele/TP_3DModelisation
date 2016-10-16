@@ -42,6 +42,8 @@ struct matrix
   void set_ortho(float left, float right, float bottom, float top, float near, float far);
   void set_look_at(const vec3 &eye, const vec3 &center, const vec3 &up);
   matrix operator*(const matrix &mat) const;
+  vec3 transform (const vec3 &in);
+
 };
 
 #endif
