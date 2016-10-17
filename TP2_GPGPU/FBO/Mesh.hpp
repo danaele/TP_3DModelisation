@@ -36,6 +36,10 @@ struct Mesh
   void FillVBOs( MeshInfo* info );
   void Draw( const MeshInfo& info );
   
+  void Scale( float const sx,float const sy,float const sz );
+  void Translate( vec3 const& t );
+
+  
   
   std::vector<vec3> positions;
   std::vector<vec3> normals;

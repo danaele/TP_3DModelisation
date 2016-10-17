@@ -106,3 +106,19 @@ void Mesh::Draw( const MeshInfo& info )
   glDrawElements(GL_TRIANGLES, info.nb_indices, GL_UNSIGNED_SHORT, 0); PRINT_OPENGL_ERROR();
 
 }
+
+void Mesh::Scale( float const sx,float const sy,float const sz )
+{
+    for(vec3& p : positions)
+    {
+        p.x*=sx;
+        p.y*=sy;
+        p.z*=sz;
+    }
+}
+
+void Mesh::Translate( vec3 const& t )
+{
+    for(vec3& p : positions)
+        p+=t;
+}

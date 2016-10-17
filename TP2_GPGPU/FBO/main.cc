@@ -21,24 +21,18 @@ static GLuint  program;
 static GLuint fbo;
 
 Mesh meshTV;
-Mesh meshTVScreen = Mesh
-  ( 
-  { vec3(-0.6f, -0.45f, 0.0f), vec3( -0.6f, 0.3f, 0.0f), vec3( 0.4f, -0.45f, 0.0f), vec3(0.4f, 0.3f, 0.0f) },
-  { vec3(-0.6f, 0.0f, 0.0f), vec3( -0.6f, 0.0f, 0.0f), vec3( 0.4f, 0.0f, 0.0f), vec3(0.4f, 0.0f, 0.0f) },
-  { vec2(0,1), vec2(0,0), vec2(1,1), vec2(1,0) },
-  { 0, 1, 2,
-    2, 1, 3 }
-  );
 
 Mesh meshBackground = Mesh
   ( 
-  { vec3(-1.0f, -1.0f, -1.0f), vec3( -1.0f, 1.0f, -1.0f), vec3( 1.0f, -1.0f, -1.0f), vec3(1.0f, 1.0f, -1.0f) },
   { vec3(-1.0f, -1.0f, 0.0f), vec3( -1.0f, 1.0f, 0.0f), vec3( 1.0f, -1.0f, 0.0f), vec3(1.0f, 1.0f, 0.0f) },
+  { vec3(0.0f, 0.0f, 0.0f), vec3( 0.0f, 0.0f, 0.0f), vec3( 0.0f, 0.0f, 0.0f), vec3(0.0f, 0.0f, 0.0f) },
   { vec2(0,1), vec2(0,0), vec2(1,1), vec2(1,0) },
   { 0, 1, 2,
     2, 1, 3 }
   );
 
+Mesh meshTVScreen = meshBackground;
+  
 Mesh meshWall = Mesh
   (
   { vec3(-1,-1, -1), vec3( 1,-1, -1), vec3( 1, 1, -1), vec3(-1, 1, -1) ,
@@ -63,16 +57,16 @@ Mesh meshWall = Mesh
 
   );
 
-
 MeshInfo info_Background;
 MeshInfo info_TV;
 MeshInfo info_TVScreen;
 MeshInfo info_Wall;
 
-
 TextureTGA fboTexture;
 TextureTGA imageTexture;
 TextureTGA brickTexture;
+TextureTGA tvTexture;
+
 
 /*****************************************************************************\
  * display_callback                                                          *
@@ -81,30 +75,29 @@ static void display_callback()
 {
   matrix projection;
 
-  projection.set_perspective(30, 1, 0.1, 20);
+  projection.set_perspective(30, 1, 0.1, 40);
   projection.rotate( 180, vec3(0,0,1));
+  projection.rotate( 5, vec3(1,0,0));
   projection.rotate( -angle_y, vec3(0,1,0));
-  projection.translate( vec3(0,0,-2) );
+  projection.translate( vec3(0,0,-8) );
   glUniformMatrix4fv(get_uni_loc(program, "projection"), 1, GL_FALSE, projection.m); PRINT_OPENGL_ERROR();
 
   //** Draw into the FBO **//
   // Selection du FBO comme framebuffer courant
   glBindFramebuffer(GL_FRAMEBUFFER, fbo); PRINT_OPENGL_ERROR();
   // Effacement du framebuffer
-  glClearColor(0.5, 0.8, 0.9, 1.0); PRINT_OPENGL_ERROR();
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); PRINT_OPENGL_ERROR();
   // Draw scene
-  // Selection de la texture_image comme texture courante:
   glBindTexture( GL_TEXTURE_2D, imageTexture.id );  PRINT_OPENGL_ERROR();
-  meshTV.Draw( info_TV );
   meshBackground.Draw( info_Background );
   glBindTexture( GL_TEXTURE_2D, brickTexture.id );  PRINT_OPENGL_ERROR();
-//   meshWall.Draw( info_Wall );
-  meshTV.Draw( info_TV );
+  meshWall.Draw( info_Wall );
 
 
   projection.set_perspective(30, 1, 0.1, 20);
-  projection.translate(vec3(0,0,-8));
+  projection.translate(vec3(0,0,-4));
+  projection.rotate( 15, vec3(1,0,0));
+  projection.rotate( 15, vec3(0,1,0));
   glUniformMatrix4fv(get_uni_loc(program, "projection"), 1, GL_FALSE, projection.m); PRINT_OPENGL_ERROR();
   
   //** Draw on the screen **//
@@ -118,7 +111,7 @@ static void display_callback()
   glBindTexture( GL_TEXTURE_2D, fboTexture.id );  PRINT_OPENGL_ERROR();
   meshTVScreen.Draw( info_TVScreen );
   // Selection de la texture image comme texture courante.
-  glBindTexture( GL_TEXTURE_2D, brickTexture.id );  PRINT_OPENGL_ERROR();
+  glBindTexture( GL_TEXTURE_2D, tvTexture.id );  PRINT_OPENGL_ERROR();
   meshTV.Draw( info_TV );
   
   glutSwapBuffers();
@@ -133,8 +126,16 @@ static void init()
   meshTV.LoadFromOBJ( "TV.obj" );
   meshTV.FillVBOs( &info_TV );
   
+  meshTVScreen.Translate( vec3(-0.15,-0.15,0) );
+  meshTVScreen.Scale( 0.5,0.35,1 );
   meshTVScreen.FillVBOs( &info_TVScreen );
+  
+  meshBackground.Translate( vec3(0,0,-20) );
+  meshBackground.Scale( 15,11.5,1 );
   meshBackground.FillVBOs( &info_Background );
+
+  meshWall.Translate( vec3(0,-2,7) );
+  meshWall.Scale( 2,0.5,0.5 );
   meshWall.FillVBOs( &info_Wall );
   
   // Creating shader.
@@ -144,7 +145,8 @@ static void init()
   // Loading texture.
   imageTexture.Load( "texture.tga" );
   brickTexture.Load( "brick.tga" );
-
+  tvTexture.Load( "black.tga" );
+  
   // Enable z-buffer
   glEnable(GL_DEPTH_TEST); PRINT_OPENGL_ERROR();
   
@@ -153,8 +155,8 @@ static void init()
   glGenFramebuffers(1, &fbo);                                                PRINT_OPENGL_ERROR();
   // Selection de ce fbo comme framebuffer courant
   glBindFramebuffer(GL_FRAMEBUFFER, fbo); 
-  // Paramétrisation d'une texture de 800 par 800: fboTexture
-  fboTexture.Load( 800, 800, 0 );
+  // Paramétrisation d'une texture de 800 par 560: fboTexture
+  fboTexture.Load( 800, 560, 0 );
   // Attachement de cette texture au FBO.
   glFramebufferTexture2D( GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, fboTexture.id, 0 );
   
@@ -164,11 +166,11 @@ static void init()
   glGenRenderbuffers( 1, &depth_render_buffer );
   // Selection de ce buffer de rendu comme "Renderbuffer" courant
   glBindRenderbuffer( GL_RENDERBUFFER, depth_render_buffer );
-  // Création d'un espace de stockage de 800x800 pixels
+  // Création d'un espace de stockage de 800x560 pixels
   glRenderbufferStorage( GL_RENDERBUFFER,     //Target must be GL_RENDERBUFFER
   	                 GL_DEPTH_COMPONENT24,//Type : Depth on 24bits
   	                 800,                 //Width in px                     
-  	                 800 );               //Height in px
+  	                 560 );               //Height in px
   // Attachement de ce tampon de profondeur au FBO courant :
   glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depth_render_buffer);
 
@@ -196,6 +198,7 @@ static void keyboard_callback(unsigned char key, int, int)
 \*****************************************************************************/
 static void special_callback(int key, int,int)
 {
+  // Handle projection rotation
   switch (key)
   {
     case GLUT_KEY_LEFT:
@@ -205,6 +208,12 @@ static void special_callback(int key, int,int)
      angle_y += 0.1f;
       break;
   }
+  // Clamp angle in [-limit, limit]
+  float limit = 11.0f;
+  if( angle_y > limit  )
+    angle_y = limit;
+  if( angle_y < -limit  )
+    angle_y = -limit;
 }
 
 /*****************************************************************************\
