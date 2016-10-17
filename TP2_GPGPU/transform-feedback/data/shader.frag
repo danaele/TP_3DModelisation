@@ -1,11 +1,13 @@
-#version 130
+#version 330
+
+uniform sampler2D text;
+
+in vec2 v_tex_coord;
 
 out vec4 color;
-
-in vec3 distanceColor;
 
 
 void main (void)
 {
-  color = vec4(distanceColor, 1.0);
+  color = texture(text, v_tex_coord);
 }
