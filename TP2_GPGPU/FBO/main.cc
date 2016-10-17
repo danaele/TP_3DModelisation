@@ -1,6 +1,8 @@
 // main.cc
 
 #include <iostream>
+#include <fstream>
+#include <sstream>
 #include <cstdlib>
 
 #define GLEW_STATIC 1
@@ -9,12 +11,68 @@
 
 #include "gl-utils.h"
 #include "matrix.h"
-#include "image.h"
 
-static float angle  = 0;
+#include "TextureTGA.hpp"
+#include "Mesh.hpp"
+
+static float angle_y  = 0.0f;
+
 static GLuint  program;
-static GLuint fbo, fbo_texture;
-static GLuint texture_image;
+static GLuint fbo;
+
+Mesh meshTV;
+Mesh meshTVScreen = Mesh
+  ( 
+  { vec3(-0.6f, -0.45f, 0.0f), vec3( -0.6f, 0.3f, 0.0f), vec3( 0.4f, -0.45f, 0.0f), vec3(0.4f, 0.3f, 0.0f) },
+  { vec3(-0.6f, 0.0f, 0.0f), vec3( -0.6f, 0.0f, 0.0f), vec3( 0.4f, 0.0f, 0.0f), vec3(0.4f, 0.0f, 0.0f) },
+  { vec2(0,1), vec2(0,0), vec2(1,1), vec2(1,0) },
+  { 0, 1, 2,
+    2, 1, 3 }
+  );
+
+Mesh meshBackground = Mesh
+  ( 
+  { vec3(-1.0f, -1.0f, -1.0f), vec3( -1.0f, 1.0f, -1.0f), vec3( 1.0f, -1.0f, -1.0f), vec3(1.0f, 1.0f, -1.0f) },
+  { vec3(-1.0f, -1.0f, 0.0f), vec3( -1.0f, 1.0f, 0.0f), vec3( 1.0f, -1.0f, 0.0f), vec3(1.0f, 1.0f, 0.0f) },
+  { vec2(0,1), vec2(0,0), vec2(1,1), vec2(1,0) },
+  { 0, 1, 2,
+    2, 1, 3 }
+  );
+
+Mesh meshWall = Mesh
+  (
+  { vec3(-1,-1, -1), vec3( 1,-1, -1), vec3( 1, 1, -1), vec3(-1, 1, -1) ,
+    vec3(-1,-1,  1), vec3( 1,-1,  1), vec3( 1, 1,  1), vec3(-1, 1,  1) ,
+    vec3(-1,-1, -1), vec3(-1,-1,  1), vec3(-1, 1,  1), vec3(-1, 1, -1) ,
+    vec3( 1,-1, -1), vec3( 1,-1,  1), vec3( 1, 1,  1), vec3( 1, 1, -1) ,
+    vec3(-1,-1, -1), vec3(-1,-1,  1), vec3( 1,-1,  1), vec3( 1,-1, -1) ,
+    vec3(-1, 1, -1), vec3(-1, 1,  1), vec3( 1, 1,  1), vec3( 1, 1, -1) },
+  { vec3(-1,-1, -1), vec3( 1,-1, -1), vec3( 1, 1, -1), vec3(-1, 1, -1) ,
+    vec3(-1,-1,  1), vec3( 1,-1,  1), vec3( 1, 1,  1), vec3(-1, 1,  1) ,
+    vec3(-1,-1, -1), vec3(-1,-1,  1), vec3(-1, 1,  1), vec3(-1, 1, -1) ,
+    vec3( 1,-1, -1), vec3( 1,-1,  1), vec3( 1, 1,  1), vec3( 1, 1, -1) ,
+    vec3(-1,-1, -1), vec3(-1,-1,  1), vec3( 1,-1,  1), vec3( 1,-1, -1) ,
+    vec3(-1, 1, -1), vec3(-1, 1,  1), vec3( 1, 1,  1), vec3( 1, 1, -1) },
+  { vec2(0,1), vec2(1,1), vec2(1,0), vec2(0,0),
+    vec2(0,1), vec2(1,1), vec2(1,0), vec2(0,0),
+    vec2(0,1), vec2(1,1), vec2(1,0), vec2(0,0),
+    vec2(0,1), vec2(1,1), vec2(1,0), vec2(0,0),
+    vec2(0,1), vec2(1,1), vec2(1,0), vec2(0,0),
+    vec2(0,1), vec2(1,1), vec2(1,0), vec2(0,0) },
+  { 0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 8, 9,10, 8,10,11, 12,13,14,12,14,15, 16,17,18,16,18,19, 20,21,22,20,22,23 }
+
+  );
+
+
+MeshInfo info_Background;
+MeshInfo info_TV;
+MeshInfo info_TVScreen;
+MeshInfo info_Wall;
+
+
+TextureTGA fboTexture;
+TextureTGA imageTexture;
+TextureTGA brickTexture;
 
 /*****************************************************************************\
  * display_callback                                                          *
@@ -23,33 +81,46 @@ static void display_callback()
 {
   matrix projection;
 
-  angle += 1;
   projection.set_perspective(30, 1, 0.1, 20);
-  projection.translate(vec3(0,0,-8));
-  projection.rotate(angle, vec3(1,1,0));
+  projection.rotate( 180, vec3(0,0,1));
+  projection.rotate( -angle_y, vec3(0,1,0));
+  projection.translate( vec3(0,0,-2) );
   glUniformMatrix4fv(get_uni_loc(program, "projection"), 1, GL_FALSE, projection.m); PRINT_OPENGL_ERROR();
 
-  // Draw into the FBO.
-  // *** Selection du FBO comme framebuffer courant
+  //** Draw into the FBO **//
+  // Selection du FBO comme framebuffer courant
   glBindFramebuffer(GL_FRAMEBUFFER, fbo); PRINT_OPENGL_ERROR();
-  // Selection de la texture_image comme texture courante:
-  glBindTexture(GL_TEXTURE_2D, texture_image);  PRINT_OPENGL_ERROR();
-  // *** Effacement du framebuffer
-  // *** Dessin du cube
+  // Effacement du framebuffer
   glClearColor(0.5, 0.8, 0.9, 1.0); PRINT_OPENGL_ERROR();
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); PRINT_OPENGL_ERROR();
-  glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_SHORT, 0); PRINT_OPENGL_ERROR();
+  // Draw scene
+  // Selection de la texture_image comme texture courante:
+  glBindTexture( GL_TEXTURE_2D, imageTexture.id );  PRINT_OPENGL_ERROR();
+  meshTV.Draw( info_TV );
+  meshBackground.Draw( info_Background );
+  glBindTexture( GL_TEXTURE_2D, brickTexture.id );  PRINT_OPENGL_ERROR();
+//   meshWall.Draw( info_Wall );
+  meshTV.Draw( info_TV );
 
-  // Draw on the screen.
-  // *** Selection de la fenêtre comme framebuffer courant
+
+  projection.set_perspective(30, 1, 0.1, 20);
+  projection.translate(vec3(0,0,-8));
+  glUniformMatrix4fv(get_uni_loc(program, "projection"), 1, GL_FALSE, projection.m); PRINT_OPENGL_ERROR();
+  
+  //** Draw on the screen **//
+  // Selection de la fenêtre comme framebuffer courant
   glBindFramebuffer(GL_FRAMEBUFFER, 0); PRINT_OPENGL_ERROR();
-  // *** Selection de la texture du fbo comme texture courante.
-  glBindTexture(GL_TEXTURE_2D, fbo_texture);  PRINT_OPENGL_ERROR();
-
+  // Effacement du buffer
   glClearColor(1.0, 1.0, 1.0, 1.0); PRINT_OPENGL_ERROR();
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); PRINT_OPENGL_ERROR();
-  glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_SHORT, 0); PRINT_OPENGL_ERROR();
-
+  // Draw scene
+  // Selection de la texture du fbo comme texture courante.
+  glBindTexture( GL_TEXTURE_2D, fboTexture.id );  PRINT_OPENGL_ERROR();
+  meshTVScreen.Draw( info_TVScreen );
+  // Selection de la texture image comme texture courante.
+  glBindTexture( GL_TEXTURE_2D, brickTexture.id );  PRINT_OPENGL_ERROR();
+  meshTV.Draw( info_TV );
+  
   glutSwapBuffers();
 }
 
@@ -58,86 +129,53 @@ static void display_callback()
 \*****************************************************************************/
 static void init()
 {
-  GLuint vao, vbo, vboi;
-  // Creating geometry.
-  struct Data{vec3 position;vec2 tex_coord;} data[] =
-  {
-    { vec3(-1,-1, -1), vec2(0,1) }, { vec3( 1,-1, -1), vec2(1,1) }, { vec3( 1, 1, -1), vec2(1,0) }, { vec3(-1, 1, -1), vec2(0,0) },
-    { vec3(-1,-1,  1), vec2(0,1) }, { vec3( 1,-1,  1), vec2(1,1) }, { vec3( 1, 1,  1), vec2(1,0) }, { vec3(-1, 1,  1), vec2(0,0) },
-    { vec3(-1,-1, -1), vec2(0,1) }, { vec3(-1,-1,  1), vec2(1,1) }, { vec3(-1, 1,  1), vec2(1,0) }, { vec3(-1, 1, -1), vec2(0,0) },
-    { vec3( 1,-1, -1), vec2(0,1) }, { vec3( 1,-1,  1), vec2(1,1) }, { vec3( 1, 1,  1), vec2(1,0) }, { vec3( 1, 1, -1), vec2(0,0) },
-    { vec3(-1,-1, -1), vec2(0,1) }, { vec3(-1,-1,  1), vec2(1,1) }, { vec3( 1,-1,  1), vec2(1,0) }, { vec3( 1,-1, -1), vec2(0,0) },
-    { vec3(-1, 1, -1), vec2(0,1) }, { vec3(-1, 1,  1), vec2(1,1) }, { vec3( 1, 1,  1), vec2(1,0) }, { vec3( 1, 1, -1), vec2(0,0) }
-  };
-  GLushort indices[] =
-  { 0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7, 8, 9,10, 8,10,11, 12,13,14,12,14,15, 16,17,18,16,18,19, 20,21,22,20,22,23 };
-  glGenVertexArrays(1, &vao);
-  glBindVertexArray(vao);
-  glGenBuffers(1, &vbo);                                                          PRINT_OPENGL_ERROR();
-  glBindBuffer(GL_ARRAY_BUFFER, vbo);                                             PRINT_OPENGL_ERROR();
-  glBufferData(GL_ARRAY_BUFFER, sizeof data, data, GL_STATIC_DRAW);               PRINT_OPENGL_ERROR();
-  glEnableVertexAttribArray(0);                                                   PRINT_OPENGL_ERROR();
-  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Data), 0);               PRINT_OPENGL_ERROR();
-  glEnableVertexAttribArray(1);                                                   PRINT_OPENGL_ERROR();
-  glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Data), BUFFER_OFFSET(sizeof(vec3)));  PRINT_OPENGL_ERROR();
-  // Index
-  glGenBuffers(1, &vboi);                                                         PRINT_OPENGL_ERROR();
-  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vboi);                                    PRINT_OPENGL_ERROR();
-  glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof indices, indices, GL_STATIC_DRAW); PRINT_OPENGL_ERROR();
+  // Load scene
+  meshTV.LoadFromOBJ( "TV.obj" );
+  meshTV.FillVBOs( &info_TV );
+  
+  meshTVScreen.FillVBOs( &info_TVScreen );
+  meshBackground.FillVBOs( &info_Background );
+  meshWall.FillVBOs( &info_Wall );
+  
   // Creating shader.
-  program = read_shader("shader.vert", "shader.frag", {"position", "tex_coord"});
+  program = read_shader("shader.vert", "shader.frag", {"position","normal","tex_coord"});
   glUniform1i (get_uni_loc(program, "texture_id"), 0); PRINT_OPENGL_ERROR();
 
   // Loading texture.
-  Image  *image = image_load_tga("texture.tga");
-  if (image)
-  {
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);                              PRINT_OPENGL_ERROR();
-    glGenTextures(1, &texture_image);                                   PRINT_OPENGL_ERROR();
-    glBindTexture(GL_TEXTURE_2D, texture_image);                        PRINT_OPENGL_ERROR();
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);       PRINT_OPENGL_ERROR();
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);       PRINT_OPENGL_ERROR();
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);   PRINT_OPENGL_ERROR();
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);   PRINT_OPENGL_ERROR();
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, image->width, image->height,
-                 0, GL_RGB, GL_UNSIGNED_BYTE, image->data);             PRINT_OPENGL_ERROR();
-    delete image;
-  }
-  else
-    abort();
+  imageTexture.Load( "texture.tga" );
+  brickTexture.Load( "brick.tga" );
+
+  // Enable z-buffer
   glEnable(GL_DEPTH_TEST); PRINT_OPENGL_ERROR();
-  // FBO
-  // *** Creation d'un objet framebuffer: fbo
+  
+  //** Creating FBO **//
+  // Creation d'un objet framebuffer: fbo
   glGenFramebuffers(1, &fbo);                                                PRINT_OPENGL_ERROR();
-  // *** Selection de ce fbo comme framebuffer courant
+  // Selection de ce fbo comme framebuffer courant
   glBindFramebuffer(GL_FRAMEBUFFER, fbo); 
-  // *** Création et paramétrisation d'une texture de 800 par 800: fbo_texture
-  glGenTextures(1, &fbo_texture);
-  glBindTexture( GL_TEXTURE_2D, fbo_texture );
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);       PRINT_OPENGL_ERROR();
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);       PRINT_OPENGL_ERROR();
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);   PRINT_OPENGL_ERROR();
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);   PRINT_OPENGL_ERROR();
-  glTexImage2D( GL_TEXTURE_2D, 0 ,GL_RGBA, 800, 800, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0 );
-  glFramebufferTexture2D( GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, fbo_texture, 0 );
-  // *** Attachement de cette texture au FBO.
-  //
+  // Paramétrisation d'une texture de 800 par 800: fboTexture
+  fboTexture.Load( 800, 800, 0 );
+  // Attachement de cette texture au FBO.
+  glFramebufferTexture2D( GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, fboTexture.id, 0 );
+  
   // Partie "tampon de profondeur du fbo".
   GLuint depth_render_buffer;
-  // *** Création d'un buffer de rendu (voir glGenRenderbuffers): depth_render_buffer
+  // Création d'un buffer de rendu : depth_render_buffer
   glGenRenderbuffers( 1, &depth_render_buffer );
-  // *** Selection de ce buffer de rendu comme "Renderbuffer" courant
+  // Selection de ce buffer de rendu comme "Renderbuffer" courant
   glBindRenderbuffer( GL_RENDERBUFFER, depth_render_buffer );
-  // *** Création d'un espace de stockage de 800x800 pixels de type "profondeur sur 24 bits" (GL_DEPTH_COMPONENT24)
-  glRenderbufferStorage( GL_RENDERBUFFER,
-  	GL_DEPTH_COMPONENT24,
-  	800,
-  	800 );
-  // attachement de ce tampon de profondeur au FBO courant :
+  // Création d'un espace de stockage de 800x800 pixels
+  glRenderbufferStorage( GL_RENDERBUFFER,     //Target must be GL_RENDERBUFFER
+  	                 GL_DEPTH_COMPONENT24,//Type : Depth on 24bits
+  	                 800,                 //Width in px                     
+  	                 800 );               //Height in px
+  // Attachement de ce tampon de profondeur au FBO courant :
   glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depth_render_buffer);
 
+  // Selection de la fenêtre comme framebuffer courant
   glBindFramebuffer(GL_FRAMEBUFFER, 0); PRINT_OPENGL_ERROR();
 }
+
 
 /*****************************************************************************\
  * keyboard_callback                                                         *
@@ -160,20 +198,13 @@ static void special_callback(int key, int,int)
 {
   switch (key)
   {
-    case GLUT_KEY_UP:
-//      angle1 += 0.1f;
-      break;
-    case GLUT_KEY_DOWN:
-//      angle1 -= 0.1f;
-      break;
     case GLUT_KEY_LEFT:
-//      angle2 += 0.1f;
+     angle_y -= 0.1f;
       break;
     case GLUT_KEY_RIGHT:
-//      angle2 -= 0.1f;
+     angle_y += 0.1f;
       break;
   }
-  glutPostRedisplay();
 }
 
 /*****************************************************************************\

@@ -22,4 +22,9 @@ GLint get_uni_loc(GLuint program, const GLchar *name);
 GLuint read_shader(const std::string &vertex_filename,
                    const std::string &fragment_filename);
 
+GLuint read_shader(const std::string &vertex_filename,
+                   const std::string &geometry_filename,
+                   const std::string &fragment_filename,
+                   const std::vector<std::string> &attributes);
+
 #endif
