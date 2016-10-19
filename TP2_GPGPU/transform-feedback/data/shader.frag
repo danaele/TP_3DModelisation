@@ -9,5 +9,7 @@ out vec4 color;
 
 void main (void)
 {
-  color = texture(text, v_tex_coord);
+  vec4 c = texture(text, v_tex_coord);
+  c.w = ( c.x + c.y + c.z )/3.0;
+  color = c;
 }

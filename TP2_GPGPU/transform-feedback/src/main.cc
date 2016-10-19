@@ -179,7 +179,7 @@ static void display_callback()
 
   //Enable transparency
   glEnable(GL_BLEND);
-  glBlendFunc(GL_ONE,  GL_ONE_MINUS_SRC_COLOR );
+  glBlendFunc(GL_ONE,  GL_ONE_MINUS_SRC_ALPHA );
   
   // Activation of the position attributes
   glBindBuffer(GL_ARRAY_BUFFER, buffers[POSITION0]);     PRINT_OPENGL_ERROR();
